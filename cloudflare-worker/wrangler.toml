@@ -1,0 +1,10 @@
+name = "steel-life-prenotazioni-api"
+main = "src/index.js"
+compatibility_date = "2026-11-24"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "steel-life-prenotazioni"
+database_id = "DA-CREARE-NEL-ACCOUNT-CLOUDFLARE"
+migrations_dir = "migrations"
+
