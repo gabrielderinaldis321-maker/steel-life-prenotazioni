@@ -1,0 +1,7 @@
+bookings.sqlite3
+bookings.sqlite3-shm
+bookings.sqlite3-wal
+__pycache__/
+*.py[cod]
+.env
+
