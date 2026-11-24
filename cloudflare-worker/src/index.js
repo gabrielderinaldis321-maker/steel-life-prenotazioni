@@ -1,6 +1,5 @@
 const CAPACITY = 8;
 const PRIME_TIME_HOUR = "19";
-const PRIME_TIME_ADVANCE_HOURS = 48;
 const PRIME_TIME_WEEKLY_LIMIT = 2;
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
@@ -59,12 +58,12 @@ function slotStartLocal(week, day, time) {
 function bookingWindowError(week, day, time) {
   const start = slotStartLocal(week, day, time);
   const now = localDateTimeParts();
+  const classDate = start.toISOString().slice(0, 10);
+  const today = `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`;
+  if (classDate !== today) return "Puoi prenotare solo i corsi di oggi.";
   const nowAsLocalUtc = Date.UTC(now.year, now.month - 1, now.day, now.hour, now.minute);
   const hoursUntil = (start.getTime() - nowAsLocalUtc) / 3_600_000;
   if (hoursUntil <= 0) return "Questo orario è già passato.";
-  if (time.slice(0, 2) === PRIME_TIME_HOUR && hoursUntil > PRIME_TIME_ADVANCE_HOURS) {
-    return `Il turno delle 19:00 si può prenotare solo nelle ${PRIME_TIME_ADVANCE_HOURS} ore precedenti.`;
-  }
   return "";
 }
 
