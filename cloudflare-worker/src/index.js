@@ -1,4 +1,7 @@
-const CAPACITY = 6;
+const CAPACITY = 8;
+const PRIME_TIME_HOUR = "19";
+const PRIME_TIME_ADVANCE_HOURS = 48;
+const PRIME_TIME_WEEKLY_LIMIT = 2;
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
   MMA: {
@@ -36,6 +39,33 @@ function validSlot(activity, day, time) {
 
 function validName(value) {
   return typeof value === "string" && value.trim().length >= 1 && value.trim().length <= 80;
+}
+
+function localDateTimeParts() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  return Object.fromEntries(parts.filter((part) => part.type !== "literal").map(({ type, value }) => [type, Number(value)]));
+}
+
+function slotStartLocal(week, day, time) {
+  const offsets = { "Lunedì": 0, "Martedì": 1, "Mercoledì": 2, "Giovedì": 3, "Venerdì": 4 };
+  const [year, month, date] = week.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1, date + offsets[day], Number(time.slice(0, 2)), Number(time.slice(3, 5))));
+  return target;
+}
+
+function bookingWindowError(week, day, time) {
+  const start = slotStartLocal(week, day, time);
+  const now = localDateTimeParts();
+  const nowAsLocalUtc = Date.UTC(now.year, now.month - 1, now.day, now.hour, now.minute);
+  const hoursUntil = (start.getTime() - nowAsLocalUtc) / 3_600_000;
+  if (hoursUntil <= 0) return "Questo orario è già passato.";
+  if (time.slice(0, 2) === PRIME_TIME_HOUR && hoursUntil > PRIME_TIME_ADVANCE_HOURS) {
+    return `Il turno delle 19:00 si può prenotare solo nelle ${PRIME_TIME_ADVANCE_HOURS} ore precedenti.`;
+  }
+  return "";
 }
 
 async function handle(request, env) {
@@ -86,18 +116,28 @@ async function handle(request, env) {
   if (!validName(first) || !validName(last)) return json({ error: "Nome e cognome sono obbligatori." }, 400, origin);
 
   if (url.pathname === "/api/book") {
+    const windowError = bookingWindowError(week, day, time);
+    if (windowError) return json({ error: windowError, reason: "BOOKING_WINDOW" }, 409, origin);
     try {
-      // A single conditional insert is serialized by D1 and cannot exceed six places.
+      // Keep capacity and the weekly prime-time limit atomic across simultaneous devices.
       const result = await env.DB.prepare(
         `INSERT INTO bookings (week_start, activity, day_name, time_slot, first_name, last_name)
          SELECT ?, ?, ?, ?, ?, ?
          WHERE (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?) < ?
+         AND (? != ? OR (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE AND substr(time_slot, 1, 2) = ?) < ?)
          RETURNING id`,
-      ).bind(week, activity, day, time, first, last, week, activity, day, time, CAPACITY).run();
+      ).bind(week, activity, day, time, first, last, week, activity, day, time, CAPACITY,
+        time.slice(0, 2), PRIME_TIME_HOUR, week, first, last, PRIME_TIME_HOUR, PRIME_TIME_WEEKLY_LIMIT).run();
       if (!result.meta.changes) {
         const current = await env.DB.prepare(
           "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
         ).bind(week, activity, day, time).first();
+        const weeklyPrimeTime = await env.DB.prepare(
+          "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE AND substr(time_slot, 1, 2) = ?",
+        ).bind(week, first, last, PRIME_TIME_HOUR).first();
+        if (time.slice(0, 2) === PRIME_TIME_HOUR && weeklyPrimeTime.booked >= PRIME_TIME_WEEKLY_LIMIT) {
+          return json({ ok: false, reason: "WEEKLY_LIMIT", error: `Puoi prenotare al massimo ${PRIME_TIME_WEEKLY_LIMIT} corsi alle 19:00 a settimana.` }, 409, origin);
+        }
         return json({ ok: false, reason: "FULL", error: "Corso completo.", booked: current.booked, remaining: 0 }, 409, origin);
       }
       const current = await env.DB.prepare(
