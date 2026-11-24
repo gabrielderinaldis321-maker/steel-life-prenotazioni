@@ -12,13 +12,14 @@ const API_BASE='https://steel-life-prenotazioni-api.gabrielderinaldis321.workers
 const WHATSAPP='393281814024',CAPACITY=8,PRIME_TIME_WEEKLY_LIMIT=2,KEY='steel-life-bookings-via-api';
 const SCHEDULE={MMA:{'Lunedì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00'],'Mercoledì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00'],'Venerdì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00']},Boxe:{'Martedì':['18:00 - 19:00'],'Giovedì':['18:00 - 19:00']},Kickboxing:{'Martedì':['19:00 - 20:00'],'Giovedì':['19:00 - 20:00']},BJJ:{'Martedì':['20:00 - 21:00'],'Giovedì':['20:00 - 21:00']}};
 const $=id=>document.getElementById(id),activity=$('attivita'),day=$('giorno'),time=$('orario');let counts={},busy=false;
-function monday(){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function localNow(){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(({type,value})=>[type,Number(value)]))}
+function monday(){const n=localNow(),d=new Date(Date.UTC(n.year,n.month-1,n.day));d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10)}
 function configured(){return API_BASE.startsWith('https://')&&!API_BASE.includes('INSERISCI-')}
 function key(a,d,t){return `${a}|${d}|${t}`}
 function allSlots(){const r=[];for(const [a,ds] of Object.entries(SCHEDULE))for(const [d,ts] of Object.entries(ds))for(const t of ts)r.push({a,d,t});return r}
-function todayName(){return ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'][new Date().getDay()]}
-function slotStart(dayName,timeSlot){const offsets={'Lunedì':0,'Martedì':1,'Mercoledì':2,'Giovedì':3,'Venerdì':4},[y,m,d]=monday().split('-').map(Number),date=new Date(y,m-1,d+offsets[dayName]);const [hh,mm]=timeSlot.slice(0,5).split(':').map(Number);date.setHours(hh,mm,0,0);return date}
-function canBookTime(dayName,timeSlot){return dayName===todayName()&&slotStart(dayName,timeSlot)>new Date()}
+function todayName(){const name=new Intl.DateTimeFormat('it-IT',{timeZone:'Europe/Rome',weekday:'long'}).format(new Date());return name.charAt(0).toLocaleUpperCase('it-IT')+name.slice(1)}
+function slotStart(dayName,timeSlot){const offsets={'Lunedì':0,'Martedì':1,'Mercoledì':2,'Giovedì':3,'Venerdì':4},[y,m,d]=monday().split('-').map(Number);return Date.UTC(y,m-1,d+offsets[dayName],Number(timeSlot.slice(0,2)),Number(timeSlot.slice(3,5)))}
+function canBookTime(dayName,timeSlot){const n=localNow(),now=Date.UTC(n.year,n.month-1,n.day,n.hour,n.minute);return dayName===todayName()&&slotStart(dayName,timeSlot)>now}
 function render(){const host=$('slots');host.innerHTML='';for(const s of allSlots()){const n=Number(counts[key(s.a,s.d,s.t)]||0),left=Math.max(0,CAPACITY-n),el=document.createElement('div');el.className='slot';el.innerHTML=`<div class="slot-top"><b>${s.a}</b><span class="count ${left===0?'full':''}">${left===0?'ESAURITO':`${n}/${CAPACITY} prenotati`}</span></div><small>${s.d} · ${s.t} · ${left} ${left===1?'posto':'posti'} disponibili</small>`;host.appendChild(el)}$('live').textContent=configured()?'● CONTEGGIO CONDIVISO':'● API NON CONFIGURATA'}
 function say(msg,type=''){const s=$('status');s.firstChild.textContent=msg;s.className='status '+type}
 function options(select,placeholder,values){select.innerHTML=`<option value="">${placeholder}</option>`;for(const v of values){const o=document.createElement('option');o.value=v;o.textContent=v;select.appendChild(o)}select.disabled=!values.length}
