@@ -1,29 +1,25 @@
 # Steel Life — prenotazioni corsi
 
-Sito GitHub Pages statico con API Python/SQLite che gira sul computer della palestra.
+Sito pubblico GitHub Pages e API Cloudflare Workers + database D1. Il database resta online anche quando il PC della palestra è spento.
 
-## Cosa fa
+## Funzioni
 
-- Mantiene sul PC un conteggio condiviso per ogni settimana, corso, giorno e orario.
-- Blocca in modo atomico il settimo posto in uno slot da sei.
-- Dopo la registrazione apre WhatsApp al proprietario, **+39 328 181 4024**, con nome e dettagli della prenotazione già compilati.
-- Se il PC o il tunnel non sono raggiungibili, apre WhatsApp come richiesta da confermare manualmente e segnala che il conteggio online non è stato aggiornato.
-- Supporta le disdette da nome, cognome e slot selezionato.
+- Orari originali per MMA, Boxe, Kickboxing e BJJ.
+- Conteggio condiviso aggiornato tra i dispositivi.
+- Limite massimo applicato dall'API: 6 prenotazioni per corso, giorno, orario e settimana.
+- Apertura di WhatsApp al proprietario, **+39 328 181 4024**, con il messaggio già compilato.
+- Disdetta cercando la prenotazione con nome, cognome e fascia oraria.
 
 ## File
 
 - `index.html`: pagina pubblica.
-- `server.py`: API e database SQLite locale.
-- `AVVIA-SERVER.bat`: avvia l'API su Windows.
-- `AVVIO-WINDOWS.md`: configurazione del tunnel e pubblicazione.
+- `cloudflare-worker/src/index.js`: API delle prenotazioni.
+- `cloudflare-worker/migrations/0001_create_bookings.sql`: schema D1.
+- `cloudflare-worker/wrangler.toml`: configurazione del Worker.
+- `CLOUDFLARE-D1-GUIDA.md`: procedura di configurazione e collegamento.
 
-Il database `bookings.sqlite3` viene creato al primo avvio e non va caricato su GitHub. Il file `.gitignore` lo esclude.
+## Configurazione necessaria
 
-## Pubblicazione
+Per rendere attivo il conteggio servono un account Cloudflare del proprietario, un database D1 e il deploy del Worker. Dopo il deploy, inserire l'indirizzo HTTPS del Worker nella costante `API_BASE` in `index.html` e pubblicare la modifica.
 
-Questa versione viene pubblicata nella repository `Sala-Pesi-Steel-Life` con GitHub Actions. Dopo il primo deploy il link sarà:
-
-`https://gabrielderinaldis321-maker.github.io/Sala-Pesi-Steel-Life/`
-
-Per abilitare il conteggio condiviso, inserisci in `index.html` l'hostname HTTPS del Cloudflare Tunnel permanente. Le istruzioni sono in `AVVIO-WINDOWS.md`. Senza API configurata il sito apre WhatsApp come richiesta manuale; non mostra un conteggio condiviso inventato.
-
+Senza un Worker configurato, la pagina continua a funzionare come richiesta manuale via WhatsApp, ma non registra prenotazioni né mostra conteggi condivisi. Non inserire password o chiavi private in questa repository pubblica.
