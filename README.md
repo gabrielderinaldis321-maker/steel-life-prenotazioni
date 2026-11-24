@@ -1,25 +1,26 @@
 # Steel Life — prenotazioni corsi
 
-Sito pubblico GitHub Pages e API Cloudflare Workers + database D1. Il database resta online anche quando il PC della palestra è spento.
+Sito pubblico GitHub Pages collegato a un’API Cloudflare Workers e al database D1. Le prenotazioni e i posti disponibili sono condivisi tra tutti i dispositivi e restano online anche a PC spento.
 
 ## Funzioni
 
 - Orari originali per MMA, Boxe, Kickboxing e BJJ.
-- Conteggio condiviso aggiornato tra i dispositivi.
-- Limite massimo applicato dall'API: 6 prenotazioni per corso, giorno, orario e settimana.
-- Apertura di WhatsApp al proprietario, **+39 328 181 4024**, con il messaggio già compilato.
-- Disdetta cercando la prenotazione con nome, cognome e fascia oraria.
+- Conteggio condiviso e aggiornato automaticamente.
+- Limite massimo di 6 prenotazioni per corso, giorno, orario e settimana.
+- Dopo una prenotazione riuscita si apre WhatsApp al proprietario (**+39 328 181 4024**) con il messaggio già compilato.
+- Le disdette aggiornano il conteggio condiviso e aprono WhatsApp.
+
+## Servizi pubblici
+
+- Sito: https://gabrielderinaldis321-maker.github.io/steel-life-prenotazioni/
+- API: https://steel-life-prenotazioni-api.gabrielderinaldis321.workers.dev
 
 ## File
 
 - `index.html`: pagina pubblica.
 - `cloudflare-worker/src/index.js`: API delle prenotazioni.
 - `cloudflare-worker/migrations/0001_create_bookings.sql`: schema D1.
-- `cloudflare-worker/wrangler.toml`: configurazione del Worker.
+- `cloudflare-worker/wrangler.toml`: configurazione del Worker e del database.
 - `CLOUDFLARE-D1-GUIDA.md`: procedura di configurazione e collegamento.
 
-## Configurazione necessaria
-
-Per rendere attivo il conteggio servono un account Cloudflare del proprietario, un database D1 e il deploy del Worker. Dopo il deploy, inserire l'indirizzo HTTPS del Worker nella costante `API_BASE` in `index.html` e pubblicare la modifica.
-
-Senza un Worker configurato, la pagina continua a funzionare come richiesta manuale via WhatsApp, ma non registra prenotazioni né mostra conteggi condivisi. Non inserire password o chiavi private in questa repository pubblica.
+Il codice è in una repository pubblica. Non inserire password o chiavi API nei file.
