@@ -5,10 +5,11 @@ Sito pubblico GitHub Pages collegato a un’API Cloudflare Workers e al database
 ## Funzioni
 
 - Orari per MMA, Boxe, Kickboxing e BJJ.
-- La sala pesi usa lo stesso database con conteggio separato e capienza di 6 persone per fascia, con orari da lunedì a sabato.
+- La sala pesi usa lo stesso database con conteggio separato e capienza di 8 persone per fascia, con orari da lunedì a sabato.
 - Conteggio condiviso e aggiornato automaticamente.
 - Limite massimo di 8 prenotazioni per corso, giorno, orario e settimana.
 - Si possono prenotare solo i corsi del giorno corrente.
+- Anche per la sala pesi si può prenotare solo una fascia della giornata corrente.
 - Dopo una prenotazione riuscita si apre WhatsApp al proprietario (**+39 328 181 4024**) con il messaggio già compilato.
 - Le disdette aggiornano il conteggio condiviso e aprono WhatsApp.
 
@@ -26,4 +27,3 @@ Sito pubblico GitHub Pages collegato a un’API Cloudflare Workers e al database
 - `CLOUDFLARE-D1-GUIDA.md`: procedura di configurazione.
 
 Il codice è in una repository pubblica. Non inserire password o chiavi API nei file.
-
