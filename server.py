@@ -5,9 +5,10 @@ import json
 import os
 import sqlite3
 from contextlib import closing
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from urllib.parse import parse_qs, urlparse
 
 HOST = "127.0.0.1"  # cloudflared connects locally; do not bind to the public network
@@ -21,7 +22,8 @@ ALLOWED_ORIGINS = {
     ).split(",")
     if item.strip()
 }
-CAPACITY = 6
+CAPACITY = 8
+SALA_PESI_CAPACITY = 8
 SCHEDULE = {
     "MMA": {
         "Lunedì": ("18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"),
@@ -31,7 +33,19 @@ SCHEDULE = {
     "Boxe": {"Martedì": ("18:00 - 19:00",), "Giovedì": ("18:00 - 19:00",)},
     "Kickboxing": {"Martedì": ("19:00 - 20:00",), "Giovedì": ("19:00 - 20:00",)},
     "BJJ": {"Martedì": ("20:00 - 21:00",), "Giovedì": ("20:00 - 21:00",)},
+    "Sala Pesi": {
+        "Lunedì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
+        "Martedì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
+        "Mercoledì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
+        "Giovedì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
+        "Venerdì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
+        "Sabato": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 13)),
+    },
 }
+
+
+def capacity_for(activity: str) -> int:
+    return SALA_PESI_CAPACITY if activity == "Sala Pesi" else CAPACITY
 
 
 def connect() -> sqlite3.Connection:
@@ -88,6 +102,22 @@ def valid_slot(activity: object, day_name: object, time_slot: object) -> bool:
         and isinstance(time_slot, str)
         and time_slot in SCHEDULE.get(activity, {}).get(day_name, ())
     )
+
+
+def booking_window_error(week: str, day_name: str, time_slot: str, activity: str) -> str | None:
+    offsets = {"Lunedì": 0, "Martedì": 1, "Mercoledì": 2, "Giovedì": 3, "Venerdì": 4, "Sabato": 5}
+    year, month, day = map(int, week.split("-"))
+    start_hour, start_minute = map(int, time_slot[:5].split(":"))
+    class_date = date(year, month, day) + timedelta(days=offsets[day_name])
+    now = datetime.now(ZoneInfo("Europe/Rome"))
+    if class_date < now.date():
+        return "Non puoi prenotare una fascia oraria già passata."
+    if class_date != now.date():
+        return "Puoi prenotare solo le fasce di oggi."
+    starts_at = datetime(class_date.year, class_date.month, class_date.day, start_hour, start_minute, tzinfo=ZoneInfo("Europe/Rome"))
+    if starts_at <= now:
+        return "Questo orario è già passato."
+    return None
 
 
 class BookingHandler(BaseHTTPRequestHandler):
@@ -184,6 +214,10 @@ class BookingHandler(BaseHTTPRequestHandler):
                 return
 
             if parsed.path == "/api/book":
+                window_error = booking_window_error(week, day_name, time_slot, activity)
+                if window_error:
+                    self._json({"ok": False, "reason": "BOOKING_WINDOW", "error": window_error}, 409)
+                    return
                 result = self._book(week, activity, day_name, time_slot, first, last)
                 self._json(result, 200 if result["ok"] else 409)
             elif parsed.path == "/api/cancel":
@@ -206,7 +240,8 @@ class BookingHandler(BaseHTTPRequestHandler):
                 "SELECT COUNT(*) FROM bookings WHERE week_start=? AND activity=? AND day_name=? AND time_slot=?",
                 (week, activity, day_name, time_slot),
             ).fetchone()[0]
-            if count >= CAPACITY:
+            capacity = capacity_for(activity)
+            if count >= capacity:
                 db.rollback()
                 return {"ok": False, "reason": "FULL", "booked": count, "remaining": 0}
             cursor = db.execute(
@@ -216,7 +251,7 @@ class BookingHandler(BaseHTTPRequestHandler):
             )
             count += 1
             db.commit()
-            return {"ok": True, "booking_id": cursor.lastrowid, "booked": count, "remaining": CAPACITY-count}
+            return {"ok": True, "booking_id": cursor.lastrowid, "booked": count, "remaining": capacity-count}
 
     @staticmethod
     def _cancel(week: str, activity: str, day_name: str, time_slot: str, first: str, last: str) -> dict:
@@ -236,7 +271,7 @@ class BookingHandler(BaseHTTPRequestHandler):
                 (week, activity, day_name, time_slot),
             ).fetchone()[0]
             db.commit()
-            return {"ok": True, "booked": count, "remaining": CAPACITY-count}
+            return {"ok": True, "booked": count, "remaining": capacity_for(activity)-count}
 
 
 if __name__ == "__main__":
@@ -244,4 +279,3 @@ if __name__ == "__main__":
     print(f"Steel Life API in ascolto su http://{HOST}:{PORT}")
     print(f"Database SQLite: {DB_PATH}")
     ThreadingHTTPServer((HOST, PORT), BookingHandler).serve_forever()
-
