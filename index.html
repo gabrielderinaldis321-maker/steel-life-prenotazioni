@@ -9,7 +9,7 @@
 <script>
 // API condivisa su Cloudflare Workers.
 const API_BASE='https://steel-life-prenotazioni-api.gabrielderinaldis321.workers.dev';
-const WHATSAPP='393281814024',CAPACITY=8,PRIME_TIME_WEEKLY_LIMIT=2,KEY='steel-life-bookings-via-api';
+const WHATSAPP='393281814024',CAPACITY=8,KEY='steel-life-bookings-via-api';
 const SCHEDULE={MMA:{'Lunedì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00'],'Mercoledì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00'],'Venerdì':['18:00 - 19:00','19:00 - 20:00','20:00 - 21:00']},Boxe:{'Martedì':['18:00 - 19:00'],'Giovedì':['18:00 - 19:00']},Kickboxing:{'Martedì':['19:00 - 20:00'],'Giovedì':['19:00 - 20:00']},BJJ:{'Martedì':['20:00 - 21:00'],'Giovedì':['20:00 - 21:00']}};
 const $=id=>document.getElementById(id),activity=$('attivita'),day=$('giorno'),time=$('orario');let counts={},busy=false;
 function localNow(){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(({type,value})=>[type,Number(value)]))}
