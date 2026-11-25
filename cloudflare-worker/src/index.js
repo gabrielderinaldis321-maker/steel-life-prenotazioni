@@ -1,5 +1,5 @@
 const CAPACITY = 8;
-const SALA_PESI_CAPACITY = 6;
+const SALA_PESI_CAPACITY = 8;
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
   MMA: {
@@ -72,7 +72,7 @@ function bookingWindowError(week, day, time, activity) {
   const classDate = start.toISOString().slice(0, 10);
   const today = `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`;
   if (classDate < today) return "Non puoi prenotare una fascia oraria già passata.";
-  if (activity !== "Sala Pesi" && classDate !== today) return "Puoi prenotare solo i corsi di oggi.";
+  if (classDate !== today) return "Puoi prenotare solo le fasce di oggi.";
   const nowAsLocalUtc = Date.UTC(now.year, now.month - 1, now.day, now.hour, now.minute);
   const hoursUntil = (start.getTime() - nowAsLocalUtc) / 3_600_000;
   if (hoursUntil <= 0) return "Questo orario è già passato.";
@@ -178,4 +178,3 @@ export default {
     });
   },
 };
-
