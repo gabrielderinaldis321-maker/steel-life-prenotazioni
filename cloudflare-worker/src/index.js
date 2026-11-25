@@ -1,6 +1,4 @@
 const CAPACITY = 8;
-const PRIME_TIME_HOUR = "19";
-const PRIME_TIME_WEEKLY_LIMIT = 2;
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
   MMA: {
@@ -118,25 +116,17 @@ async function handle(request, env) {
     const windowError = bookingWindowError(week, day, time);
     if (windowError) return json({ error: windowError, reason: "BOOKING_WINDOW" }, 409, origin);
     try {
-      // Keep capacity and the weekly prime-time limit atomic across simultaneous devices.
+      // Keep capacity atomic across simultaneous devices.
       const result = await env.DB.prepare(
         `INSERT INTO bookings (week_start, activity, day_name, time_slot, first_name, last_name)
          SELECT ?, ?, ?, ?, ?, ?
          WHERE (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?) < ?
-         AND (? != ? OR (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE AND substr(time_slot, 1, 2) = ?) < ?)
          RETURNING id`,
-      ).bind(week, activity, day, time, first, last, week, activity, day, time, CAPACITY,
-        time.slice(0, 2), PRIME_TIME_HOUR, week, first, last, PRIME_TIME_HOUR, PRIME_TIME_WEEKLY_LIMIT).run();
+      ).bind(week, activity, day, time, first, last, week, activity, day, time, CAPACITY).run();
       if (!result.meta.changes) {
         const current = await env.DB.prepare(
           "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
         ).bind(week, activity, day, time).first();
-        const weeklyPrimeTime = await env.DB.prepare(
-          "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE AND substr(time_slot, 1, 2) = ?",
-        ).bind(week, first, last, PRIME_TIME_HOUR).first();
-        if (time.slice(0, 2) === PRIME_TIME_HOUR && weeklyPrimeTime.booked >= PRIME_TIME_WEEKLY_LIMIT) {
-          return json({ ok: false, reason: "WEEKLY_LIMIT", error: `Puoi prenotare al massimo ${PRIME_TIME_WEEKLY_LIMIT} corsi alle 19:00 a settimana.` }, 409, origin);
-        }
         return json({ ok: false, reason: "FULL", error: "Corso completo.", booked: current.booked, remaining: 0 }, 409, origin);
       }
       const current = await env.DB.prepare(
