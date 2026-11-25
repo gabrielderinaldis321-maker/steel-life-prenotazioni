@@ -1,4 +1,5 @@
 const CAPACITY = 8;
+const SALA_PESI_CAPACITY = 6;
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
   MMA: {
@@ -9,7 +10,19 @@ const SCHEDULE = {
   Boxe: { "Martedì": ["18:00 - 19:00"], "Giovedì": ["18:00 - 19:00"] },
   Kickboxing: { "Martedì": ["19:00 - 20:00"], "Giovedì": ["19:00 - 20:00"] },
   BJJ: { "Martedì": ["20:00 - 21:00"], "Giovedì": ["20:00 - 21:00"] },
+  "Sala Pesi": {
+    "Lunedì": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"],
+    "Martedì": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"],
+    "Mercoledì": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"],
+    "Giovedì": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"],
+    "Venerdì": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"],
+    "Sabato": ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00"],
+  },
 };
+
+function capacityFor(activity) {
+  return activity === "Sala Pesi" ? SALA_PESI_CAPACITY : CAPACITY;
+}
 
 function json(data, status = 200, origin = "") {
   const headers = {
@@ -47,18 +60,19 @@ function localDateTimeParts() {
 }
 
 function slotStartLocal(week, day, time) {
-  const offsets = { "Lunedì": 0, "Martedì": 1, "Mercoledì": 2, "Giovedì": 3, "Venerdì": 4 };
+  const offsets = { "Lunedì": 0, "Martedì": 1, "Mercoledì": 2, "Giovedì": 3, "Venerdì": 4, "Sabato": 5 };
   const [year, month, date] = week.split("-").map(Number);
   const target = new Date(Date.UTC(year, month - 1, date + offsets[day], Number(time.slice(0, 2)), Number(time.slice(3, 5))));
   return target;
 }
 
-function bookingWindowError(week, day, time) {
+function bookingWindowError(week, day, time, activity) {
   const start = slotStartLocal(week, day, time);
   const now = localDateTimeParts();
   const classDate = start.toISOString().slice(0, 10);
   const today = `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`;
-  if (classDate !== today) return "Puoi prenotare solo i corsi di oggi.";
+  if (classDate < today) return "Non puoi prenotare una fascia oraria già passata.";
+  if (activity !== "Sala Pesi" && classDate !== today) return "Puoi prenotare solo i corsi di oggi.";
   const nowAsLocalUtc = Date.UTC(now.year, now.month - 1, now.day, now.hour, now.minute);
   const hoursUntil = (start.getTime() - nowAsLocalUtc) / 3_600_000;
   if (hoursUntil <= 0) return "Questo orario è già passato.";
@@ -92,7 +106,7 @@ async function handle(request, env) {
     ).bind(week).all();
     const counts = {};
     for (const row of rows.results) counts[`${row.activity}|${row.day_name}|${row.time_slot}`] = row.booked;
-    return json({ week_start: week, capacity: CAPACITY, counts }, 200, origin);
+    return json({ week_start: week, capacity: CAPACITY, capacities: { "Sala Pesi": SALA_PESI_CAPACITY }, counts }, 200, origin);
   }
 
   if (request.method !== "POST" || !["/api/book", "/api/cancel"].includes(url.pathname)) {
@@ -113,7 +127,8 @@ async function handle(request, env) {
   if (!validName(first) || !validName(last)) return json({ error: "Nome e cognome sono obbligatori." }, 400, origin);
 
   if (url.pathname === "/api/book") {
-    const windowError = bookingWindowError(week, day, time);
+    const capacity = capacityFor(activity);
+    const windowError = bookingWindowError(week, day, time, activity);
     if (windowError) return json({ error: windowError, reason: "BOOKING_WINDOW" }, 409, origin);
     try {
       // Keep capacity atomic across simultaneous devices.
@@ -122,17 +137,18 @@ async function handle(request, env) {
          SELECT ?, ?, ?, ?, ?, ?
          WHERE (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?) < ?
          RETURNING id`,
-      ).bind(week, activity, day, time, first, last, week, activity, day, time, CAPACITY).run();
+      ).bind(week, activity, day, time, first, last, week, activity, day, time, capacity,
+      ).run();
       if (!result.meta.changes) {
         const current = await env.DB.prepare(
           "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
         ).bind(week, activity, day, time).first();
-        return json({ ok: false, reason: "FULL", error: "Corso completo.", booked: current.booked, remaining: 0 }, 409, origin);
+        return json({ ok: false, reason: "FULL", error: `${activity === "Sala Pesi" ? "Fascia oraria" : "Corso"} completo.`, booked: current.booked, remaining: 0 }, 409, origin);
       }
       const current = await env.DB.prepare(
         "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
       ).bind(week, activity, day, time).first();
-      return json({ ok: true, booked: current.booked, remaining: CAPACITY - current.booked }, 200, origin);
+      return json({ ok: true, booked: current.booked, remaining: capacity - current.booked, capacity }, 200, origin);
     } catch (error) {
       if (String(error).includes("UNIQUE constraint failed")) {
         return json({ error: "Hai già una prenotazione per questo corso e orario." }, 409, origin);
@@ -151,7 +167,7 @@ async function handle(request, env) {
   const current = await env.DB.prepare(
     "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
   ).bind(week, activity, day, time).first();
-  return json({ ok: true, booked: current.booked, remaining: CAPACITY - current.booked }, 200, origin);
+  return json({ ok: true, booked: current.booked, remaining: capacityFor(activity) - current.booked, capacity: capacityFor(activity) }, 200, origin);
 }
 
 export default {
