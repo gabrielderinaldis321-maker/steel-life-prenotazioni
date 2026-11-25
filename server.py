@@ -33,6 +33,8 @@ SCHEDULE = {
     "Boxe": {"Martedì": ("18:00 - 19:00",), "Giovedì": ("18:00 - 19:00",)},
     "Kickboxing": {"Martedì": ("19:00 - 20:00",), "Giovedì": ("19:00 - 20:00",)},
     "BJJ": {"Martedì": ("20:00 - 21:00",), "Giovedì": ("20:00 - 21:00",)},
+    "Tabata": {"Lunedì": ("16:00 - 17:00",), "Venerdì": ("16:00 - 17:00",)},
+    "Pilates": {"Martedì": ("16:00 - 17:00",), "Giovedì": ("16:00 - 17:00",)},
     "Sala Pesi": {
         "Lunedì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
         "Martedì": tuple(f"{hour:02d}:00 - {hour + 1:02d}:00" for hour in range(7, 21)),
