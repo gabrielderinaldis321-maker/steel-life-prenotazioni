@@ -7,7 +7,7 @@ Sito pubblico GitHub Pages collegato a un’API Cloudflare Workers e al database
 - Orari per MMA, Boxe, Kickboxing e BJJ.
 - Conteggio condiviso e aggiornato automaticamente.
 - Limite massimo di 8 prenotazioni per corso, giorno, orario e settimana.
-- Si possono prenotare solo i corsi del giorno corrente; ogni persona può prenotare al massimo 2 turni delle 19:00 a settimana.
+- Si possono prenotare solo i corsi del giorno corrente.
 - Dopo una prenotazione riuscita si apre WhatsApp al proprietario (**+39 328 181 4024**) con il messaggio già compilato.
 - Le disdette aggiornano il conteggio condiviso e aprono WhatsApp.
 
