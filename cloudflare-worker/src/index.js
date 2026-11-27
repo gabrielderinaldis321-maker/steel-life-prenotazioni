@@ -165,11 +165,22 @@ async function handle(request, env) {
       const result = await env.DB.prepare(
         `INSERT INTO bookings (week_start, activity, day_name, time_slot, first_name, last_name)
          SELECT ?, ?, ?, ?, ?, ?
-         WHERE (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?) < ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM bookings
+           WHERE week_start = ? AND day_name = ?
+             AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE
+         )
+         AND (SELECT COUNT(*) FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?) < ?
          RETURNING id`,
-      ).bind(week, activity, day, time, first, last, week, activity, day, time, capacity,
+      ).bind(week, activity, day, time, first, last, week, day, first, last, week, activity, day, time, capacity,
       ).run();
       if (!result.meta.changes) {
+        const sameDay = await env.DB.prepare(
+          "SELECT id FROM bookings WHERE week_start = ? AND day_name = ? AND first_name = ? COLLATE NOCASE AND last_name = ? COLLATE NOCASE LIMIT 1",
+        ).bind(week, day, first, last).first();
+        if (sameDay) {
+          return json({ ok: false, reason: "DUPLICATE_DAY", error: "Hai già una prenotazione per un altro corso in questa giornata." }, 409, origin);
+        }
         const current = await env.DB.prepare(
           "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
         ).bind(week, activity, day, time).first();
