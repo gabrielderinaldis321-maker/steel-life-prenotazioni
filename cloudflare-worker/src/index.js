@@ -1,5 +1,6 @@
 const CAPACITY = 8;
 const SALA_PESI_CAPACITY = 8;
+const PUBLIC_COURSE_ACTIVITIES = ["MMA", "Boxe", "Kickboxing", "BJJ"];
 const ALLOWED_ORIGIN = "https://gabrielderinaldis321-maker.github.io";
 const SCHEDULE = {
   MMA: {
@@ -31,7 +32,7 @@ function json(data, status = 200, origin = "") {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
     "access-control-allow-methods": "GET, POST, OPTIONS",
-    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-headers": "Content-Type, Authorization",
     "vary": "Origin",
   };
   if (origin === ALLOWED_ORIGIN) headers["access-control-allow-origin"] = origin;
@@ -81,6 +82,24 @@ function bookingWindowError(week, day, time, activity) {
   return "";
 }
 
+async function sendBookingEmail(env, booking) {
+  if (!env.EMAIL_WEBHOOK_URL || !env.EMAIL_WEBHOOK_SECRET) return false;
+  try {
+    const response = await fetch(env.EMAIL_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: env.EMAIL_WEBHOOK_SECRET, booking }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return false;
+    const result = await response.json().catch(() => null);
+    return result?.ok === true;
+  } catch (error) {
+    console.error("Booking email notification failed", error?.name || "Error");
+    return false;
+  }
+}
+
 async function handle(request, env) {
   const origin = request.headers.get("Origin") || "";
   if (request.method === "OPTIONS") {
@@ -90,7 +109,7 @@ async function handle(request, env) {
       headers: {
         "access-control-allow-origin": origin,
         "access-control-allow-methods": "GET, POST, OPTIONS",
-        "access-control-allow-headers": "Content-Type",
+        "access-control-allow-headers": "Content-Type, Authorization",
         "access-control-max-age": "86400",
         "vary": "Origin",
       },
@@ -100,6 +119,15 @@ async function handle(request, env) {
 
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true }, 200, origin);
+  if (request.method === "GET" && url.pathname === "/api/bookings") {
+    const week = url.searchParams.get("week_start");
+    if (!validWeek(week)) return json({ error: "Settimana non valida." }, 400, origin);
+    const rows = await env.DB.prepare(
+      "SELECT activity, day_name, time_slot, first_name, last_name FROM bookings WHERE week_start = ? AND activity IN (?, ?, ?, ?) ORDER BY day_name, time_slot, activity, last_name, first_name",
+    ).bind(week, ...PUBLIC_COURSE_ACTIVITIES).all();
+    return json({ week_start: week, bookings: rows.results }, 200, origin);
+  }
+
   if (request.method === "GET" && url.pathname === "/api/slots") {
     const week = url.searchParams.get("week_start");
     if (!validWeek(week)) return json({ error: "Settimana non valida." }, 400, origin);
@@ -150,7 +178,15 @@ async function handle(request, env) {
       const current = await env.DB.prepare(
         "SELECT COUNT(*) AS booked FROM bookings WHERE week_start = ? AND activity = ? AND day_name = ? AND time_slot = ?",
       ).bind(week, activity, day, time).first();
-      return json({ ok: true, booked: current.booked, remaining: capacity - current.booked, capacity }, 200, origin);
+      const emailSent = await sendBookingEmail(env, {
+        first_name: first,
+        last_name: last,
+        activity,
+        day_name: day,
+        time_slot: time,
+        week_start: week,
+      });
+      return json({ ok: true, booked: current.booked, remaining: capacity - current.booked, capacity, email_sent: emailSent }, 200, origin);
     } catch (error) {
       if (String(error).includes("UNIQUE constraint failed")) {
         return json({ error: "Hai già una prenotazione per questo corso e orario." }, 409, origin);
